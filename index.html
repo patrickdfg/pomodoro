@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<!-- 포모도로 집중 플래너: 25분 집중·5분/15분 휴식 타이머 한 장짜리 페이지 -->
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>포모도로 집중 플래너</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Pretendard 는 Google Fonts 에 없다. 기기에 깔려 있으면 쓰고, 없으면 기본 한글 글꼴로 */
+        body { font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="w-full max-w-md bg-slate-800 rounded-3xl shadow-2xl p-5 sm:p-8 border border-slate-700">
+        <!-- 헤더 -->
+        <h1 class="text-2xl font-bold text-center mb-6 text-indigo-400">🍅 포모도로 플래너</h1>
+
+        <!-- 모드 선택 탭 -->
+        <div class="flex bg-slate-900 p-1.5 rounded-2xl mb-8">
+            <button id="tab-work" onclick="switchMode('work')" class="flex-1 py-2.5 rounded-xl text-xs sm:text-sm whitespace-nowrap font-semibold transition-all bg-indigo-600 text-white shadow-md">집중 (25분)</button>
+            <button id="tab-shortBreak" onclick="switchMode('shortBreak')" class="flex-1 py-2.5 rounded-xl text-xs sm:text-sm whitespace-nowrap font-semibold transition-all text-slate-400 hover:text-white">짧은 휴식 (5분)</button>
+            <button id="tab-longBreak" onclick="switchMode('longBreak')" class="flex-1 py-2.5 rounded-xl text-xs sm:text-sm whitespace-nowrap font-semibold transition-all text-slate-400 hover:text-white">긴 휴식 (15분)</button>
+        </div>
+
+        <!-- 타이머 디스플레이 -->
+        <div class="text-center mb-8">
+            <div id="timer-display" class="text-7xl font-bold tracking-wider text-white mb-2">25:00</div>
+            <p id="timer-status" class="text-sm text-slate-400">집중할 시간입니다. 힘내세요!</p>
+        </div>
+
+        <!-- 컨트롤 버튼 -->
+        <div class="flex gap-3 mb-8">
+            <button id="btn-start" onclick="toggleTimer()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-indigo-600/30">시작</button>
+            <button onclick="resetTimer()" class="px-5 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-3.5 rounded-2xl transition-all">초기화</button>
+        </div>
+
+        <!-- 통계 및 기록 -->
+        <div class="border-t border-slate-700/60 pt-6 flex justify-around text-center">
+            <div>
+                <p class="text-xs text-slate-400 mb-1">완료한 포모도로</p>
+                <p id="completed-count" class="text-2xl font-bold text-indigo-400">0회</p>
+            </div>
+            <div class="border-r border-slate-700"></div>
+            <div>
+                <p class="text-xs text-slate-400 mb-1">오늘 총 집중 시간</p>
+                <p id="total-time" class="text-2xl font-bold text-emerald-400">0분</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 스크립트 로직 -->
+    <script>
+        let WORK_TIME = 25 * 60;
+        let SHORT_BREAK_TIME = 5 * 60;
+        let LONG_BREAK_TIME = 15 * 60;
+
+        let currentTime = WORK_TIME;
+        let timerId = null;
+        let isRunning = false;
+        let endAt = 0; // 끝나는 시각(ms). 백그라운드 탭에서 setInterval 이 늦어져도 남은 시간이 밀리지 않게
+        let audioCtx = null;
+        let currentMode = 'work'; // work, shortBreak, longBreak
+        let completedPomodoros = 0;
+        let totalFocusMinutes = 0;
+
+        const display = document.getElementById('timer-display');
+        const statusText = document.getElementById('timer-status');
+        const startBtn = document.getElementById('btn-start');
+        const completedCountEl = document.getElementById('completed-count');
+        const totalTimeEl = document.getElementById('total-time');
+
+        function updateDisplay() {
+            const minutes = Math.floor(currentTime / 60);
+            const seconds = currentTime % 60;
+            display.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            document.title = `(${display.textContent}) 포모도로 플래너`;
+        }
+
+        function switchMode(mode) {
+            if (isRunning) {
+                if (!confirm('타이머가 작동 중입니다. 모드를 바꾸시겠습니까?')) return;
+                pauseTimer();
+            }
+
+            currentMode = mode;
+            
+            // 탭 스타일 변경
+            ['work', 'shortBreak', 'longBreak'].forEach(m => {
+                const btn = document.getElementById(`tab-${m}`);
+                if (m === mode) {
+                    btn.className = "flex-1 py-2.5 rounded-xl text-xs sm:text-sm whitespace-nowrap font-semibold transition-all bg-indigo-600 text-white shadow-md";
+                } else {
+                    btn.className = "flex-1 py-2.5 rounded-xl text-xs sm:text-sm whitespace-nowrap font-semibold transition-all text-slate-400 hover:text-white";
+                }
+            });
+
+            if (mode === 'work') {
+                currentTime = WORK_TIME;
+                statusText.textContent = "집중할 시간입니다. 힘내세요!";
+            } else if (mode === 'shortBreak') {
+                currentTime = SHORT_BREAK_TIME;
+                statusText.textContent = "잠깐 머리를 식히는 휴식 시간입니다.";
+            } else if (mode === 'longBreak') {
+                currentTime = LONG_BREAK_TIME;
+                statusText.textContent = "충분한 휴식을 취하며 에너지를 충전하세요.";
+            }
+
+            updateDisplay();
+        }
+
+        function toggleTimer() {
+            if (isRunning) {
+                pauseTimer();
+            } else {
+                startTimer();
+            }
+        }
+
+        function startTimer() {
+            // 브라우저는 사용자가 누른 순간에 만든 오디오만 소리를 내 주므로 여기서 미리 만들어 둔다
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+            } catch (e) {
+                console.log("Audio context not supported");
+            }
+
+            isRunning = true;
+            endAt = Date.now() + currentTime * 1000;
+            startBtn.textContent = "일시정지";
+            startBtn.className = "flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-amber-600/30";
+
+            timerId = setInterval(tick, 250);
+        }
+
+        function tick() {
+            currentTime = Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
+            updateDisplay();
+            if (currentTime > 0) return;
+
+            clearInterval(timerId);
+            isRunning = false;
+            startBtn.textContent = "시작";
+            startBtn.className = "flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-indigo-600/30";
+            playAlarm();
+
+            if (currentMode === 'work') {
+                completedPomodoros++;
+                totalFocusMinutes += WORK_TIME / 60;
+                completedCountEl.textContent = `${completedPomodoros}회`;
+                totalTimeEl.textContent = `${totalFocusMinutes}분`;
+                alert('🎉 25분 집중 완료! 휴식 시간을 가지세요.');
+                switchMode('shortBreak');
+            } else {
+                alert('⏰ 휴식 종료! 다시 집중을 시작해볼까요?');
+                switchMode('work');
+            }
+        }
+
+        function pauseTimer() {
+            isRunning = false;
+            clearInterval(timerId);
+            startBtn.textContent = "시작";
+            startBtn.className = "flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-indigo-600/30";
+        }
+
+        function resetTimer() {
+            pauseTimer();
+            switchMode(currentMode);
+        }
+
+        // 웹 오디오 API를 이용한 알림음 생성
+        function playAlarm() {
+            if (!audioCtx) return;
+            try {
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 노트
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.5);
+            } catch (e) {
+                console.log("Audio context not supported");
+            }
+        }
+
+        updateDisplay();
+    </script>
+</body>
+</html>
