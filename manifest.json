@@ -1,13 +1,13 @@
 {
- "name": "포모도로 집중 플래너",
- "short_name": "포모도로",
- "description": "25분 집중 · 5/15분 휴식 타이머",
+ "name": "Study Bunny · 나의 작은 집중 공간",
+ "short_name": "Study Bunny",
+ "description": "토끼와 함께하는 아기자기한 집중 · 할 일 앱",
  "start_url": "./",
  "scope": "./",
  "display": "standalone",
  "orientation": "portrait",
- "background_color": "#0f172a",
- "theme_color": "#0f172a",
+ "background_color": "#fff1ec",
+ "theme_color": "#fff1ec",
  "lang": "ko",
  "icons": [
   { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },

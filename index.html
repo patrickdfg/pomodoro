@@ -1,207 +1,47 @@
-<!DOCTYPE html>
-<!-- 포모도로 집중 플래너: 25분 집중·5분/15분 휴식 타이머 한 장짜리 페이지 -->
+<!doctype html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>포모도로 집중 플래너</title>
-    <!-- 홈 화면 바로가기 아이콘 -->
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#0f172a">
-    <link rel="icon" href="icons/icon-192.png">
-    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="포모도로">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Pretendard 는 Google Fonts 에 없다. 기기에 깔려 있으면 쓰고, 없으면 기본 한글 글꼴로 */
-        body { font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif; }
-    </style>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#fff1ec"><meta name="description" content="토끼와 함께하는 아기자기한 집중 · 할 일 앱"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Study Bunny"><title>Study Bunny · 나의 작은 집중 공간</title><link rel="manifest" href="manifest.json"><link rel="icon" href="icons/bunny.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="stylesheet" href="styles.css"><script src="app.js" defer></script>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center justify-center p-4">
-
-    <div class="w-full max-w-md bg-slate-800 rounded-3xl shadow-2xl p-5 sm:p-8 border border-slate-700">
-        <!-- 헤더 -->
-        <h1 class="text-2xl font-bold text-center mb-6 text-indigo-400">🍅 포모도로 플래너</h1>
-
-        <!-- 모드 선택 탭 -->
-        <div class="flex bg-slate-900 p-1.5 rounded-2xl mb-8">
-            <button id="tab-work" onclick="switchMode('work')" class="flex-1 py-2.5 rounded-xl text-xs sm:text-sm whitespace-nowrap font-semibold transition-all bg-indigo-600 text-white shadow-md">집중 (25분)</button>
-            <button id="tab-shortBreak" onclick="switchMode('shortBreak')" class="flex-1 py-2.5 rounded-xl text-xs sm:text-sm whitespace-nowrap font-semibold transition-all text-slate-400 hover:text-white">짧은 휴식 (5분)</button>
-            <button id="tab-longBreak" onclick="switchMode('longBreak')" class="flex-1 py-2.5 rounded-xl text-xs sm:text-sm whitespace-nowrap font-semibold transition-all text-slate-400 hover:text-white">긴 휴식 (15분)</button>
-        </div>
-
-        <!-- 타이머 디스플레이 -->
-        <div class="text-center mb-8">
-            <div id="timer-display" class="text-7xl font-bold tracking-wider text-white mb-2">25:00</div>
-            <p id="timer-status" class="text-sm text-slate-400">집중할 시간입니다. 힘내세요!</p>
-        </div>
-
-        <!-- 컨트롤 버튼 -->
-        <div class="flex gap-3 mb-8">
-            <button id="btn-start" onclick="toggleTimer()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-indigo-600/30">시작</button>
-            <button onclick="resetTimer()" class="px-5 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-3.5 rounded-2xl transition-all">초기화</button>
-        </div>
-
-        <!-- 통계 및 기록 -->
-        <div class="border-t border-slate-700/60 pt-6 flex justify-around text-center">
-            <div>
-                <p class="text-xs text-slate-400 mb-1">완료한 포모도로</p>
-                <p id="completed-count" class="text-2xl font-bold text-indigo-400">0회</p>
-            </div>
-            <div class="border-r border-slate-700"></div>
-            <div>
-                <p class="text-xs text-slate-400 mb-1">오늘 총 집중 시간</p>
-                <p id="total-time" class="text-2xl font-bold text-emerald-400">0분</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- 스크립트 로직 -->
-    <script>
-        let WORK_TIME = 25 * 60;
-        let SHORT_BREAK_TIME = 5 * 60;
-        let LONG_BREAK_TIME = 15 * 60;
-
-        let currentTime = WORK_TIME;
-        let timerId = null;
-        let isRunning = false;
-        let endAt = 0; // 끝나는 시각(ms). 백그라운드 탭에서 setInterval 이 늦어져도 남은 시간이 밀리지 않게
-        let audioCtx = null;
-        let currentMode = 'work'; // work, shortBreak, longBreak
-        let completedPomodoros = 0;
-        let totalFocusMinutes = 0;
-
-        const display = document.getElementById('timer-display');
-        const statusText = document.getElementById('timer-status');
-        const startBtn = document.getElementById('btn-start');
-        const completedCountEl = document.getElementById('completed-count');
-        const totalTimeEl = document.getElementById('total-time');
-
-        function updateDisplay() {
-            const minutes = Math.floor(currentTime / 60);
-            const seconds = currentTime % 60;
-            display.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            document.title = `(${display.textContent}) 포모도로 플래너`;
-        }
-
-        function switchMode(mode) {
-            if (isRunning) {
-                if (!confirm('타이머가 작동 중입니다. 모드를 바꾸시겠습니까?')) return;
-                pauseTimer();
-            }
-
-            currentMode = mode;
-            
-            // 탭 스타일 변경
-            ['work', 'shortBreak', 'longBreak'].forEach(m => {
-                const btn = document.getElementById(`tab-${m}`);
-                if (m === mode) {
-                    btn.className = "flex-1 py-2.5 rounded-xl text-xs sm:text-sm whitespace-nowrap font-semibold transition-all bg-indigo-600 text-white shadow-md";
-                } else {
-                    btn.className = "flex-1 py-2.5 rounded-xl text-xs sm:text-sm whitespace-nowrap font-semibold transition-all text-slate-400 hover:text-white";
-                }
-            });
-
-            if (mode === 'work') {
-                currentTime = WORK_TIME;
-                statusText.textContent = "집중할 시간입니다. 힘내세요!";
-            } else if (mode === 'shortBreak') {
-                currentTime = SHORT_BREAK_TIME;
-                statusText.textContent = "잠깐 머리를 식히는 휴식 시간입니다.";
-            } else if (mode === 'longBreak') {
-                currentTime = LONG_BREAK_TIME;
-                statusText.textContent = "충분한 휴식을 취하며 에너지를 충전하세요.";
-            }
-
-            updateDisplay();
-        }
-
-        function toggleTimer() {
-            if (isRunning) {
-                pauseTimer();
-            } else {
-                startTimer();
-            }
-        }
-
-        function startTimer() {
-            // 브라우저는 사용자가 누른 순간에 만든 오디오만 소리를 내 주므로 여기서 미리 만들어 둔다
-            try {
-                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                if (audioCtx.state === 'suspended') audioCtx.resume();
-            } catch (e) {
-                console.log("Audio context not supported");
-            }
-
-            isRunning = true;
-            endAt = Date.now() + currentTime * 1000;
-            startBtn.textContent = "일시정지";
-            startBtn.className = "flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-amber-600/30";
-
-            timerId = setInterval(tick, 250);
-        }
-
-        function tick() {
-            currentTime = Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
-            updateDisplay();
-            if (currentTime > 0) return;
-
-            clearInterval(timerId);
-            isRunning = false;
-            startBtn.textContent = "시작";
-            startBtn.className = "flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-indigo-600/30";
-            playAlarm();
-
-            if (currentMode === 'work') {
-                completedPomodoros++;
-                totalFocusMinutes += WORK_TIME / 60;
-                completedCountEl.textContent = `${completedPomodoros}회`;
-                totalTimeEl.textContent = `${totalFocusMinutes}분`;
-                alert('🎉 25분 집중 완료! 휴식 시간을 가지세요.');
-                switchMode('shortBreak');
-            } else {
-                alert('⏰ 휴식 종료! 다시 집중을 시작해볼까요?');
-                switchMode('work');
-            }
-        }
-
-        function pauseTimer() {
-            isRunning = false;
-            clearInterval(timerId);
-            startBtn.textContent = "시작";
-            startBtn.className = "flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-indigo-600/30";
-        }
-
-        function resetTimer() {
-            pauseTimer();
-            switchMode(currentMode);
-        }
-
-        // 웹 오디오 API를 이용한 알림음 생성
-        function playAlarm() {
-            if (!audioCtx) return;
-            try {
-                const oscillator = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
-
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 노트
-                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-
-                oscillator.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-
-                oscillator.start();
-                oscillator.stop(audioCtx.currentTime + 0.5);
-            } catch (e) {
-                console.log("Audio context not supported");
-            }
-        }
-
-        updateDisplay();
-    </script>
-</body>
-</html>
+<body data-view="home" data-theme="sunny">
+<svg class="icon-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+<symbol id="i-bunny" viewBox="0 0 48 48"><path d="M12 22C2 1 18-5 20 20h7C30-5 45 1 36 23c13 20-6 24-13 23S0 42 12 22Z" fill="#fff9ee"/><path d="m14 8 3 10m17-10-3 10" stroke="#f5a8b9" stroke-width="5"/><path d="M16 32h.1m15 0h.1" stroke-width="3.5"/><path d="m21 35 3 2 3-2"/><path d="M10 36h4m20 0h4" stroke="#f5a8b9" stroke-width="4"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8M5 10v11h5v-7h4v7h5V10"/></symbol>
+<symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="14" r="8"/><path d="M12 6V2m-3 0h6m-3 7v5l2 2M18 5l2 2"/></symbol>
+<symbol id="i-tasks" viewBox="0 0 24 24"><path d="M8 4H4v18h16V4h-4M9 2h6v5H9Z"/><path d="m7 12 1 1 2-2m3 1h4m-10 5 1 1 2-2m3 1h4"/></symbol>
+<symbol id="i-palette" viewBox="0 0 24 24"><path d="M21 10C21 1 4-1 2 11s11 13 11 9-3-5 2-5 6-2 6-5Z"/><circle cx="7" cy="9" r="1"/><circle cx="12" cy="6" r="1"/><circle cx="17" cy="9" r="1"/><circle cx="6" cy="14" r="1"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 12h4v9H3Zm7-9h4v18h-4Zm7 5h4v13h-4Z"/></symbol>
+<symbol id="i-flower" viewBox="0 0 24 24"><path d="M12 7C5-4 1 7 7 10c-12 0-6 12 0 7-3 11 11 10 9 1 8 6 12-7 3-8 7-7-5-13-7-3Z" fill="#f9a6ba"/><circle cx="12" cy="13" r="3" fill="#ffe29c"/></symbol>
+<symbol id="i-leaf" viewBox="0 0 24 24"><path d="M20 3C-1 0 1 22 13 17c5-2 6-9 7-14Z" fill="#a8cd80"/><path d="M5 21 16 8"/></symbol>
+<symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 21 3 12C-4 2 8-2 12 6 16-2 28 2 21 12Z" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="m9 3 1-2h4l1 2 3 2 2 1v4l-1 2 1 2v4l-3 1-2 2h-5l-2-2-3-1v-4l1-2-1-2V6l2-1Z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 15C7 20 4 7 12 2-4 3 1 25 16 21Z" fill="#ffe8b4"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="m7 4 13 8L7 20Z" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 9a9 9 0 1 1 0 8M4 3v6h6"/></symbol>
+</defs></svg>
+<div class="page-flower flower-one" aria-hidden="true">✿</div><div class="page-flower flower-two" aria-hidden="true">✿</div>
+<div class="app-shell">
+<header class="site-header"><a href="#home" class="brand" aria-label="Study Bunny 홈"><svg class="brand-bunny"><use href="#i-bunny"/></svg><span><span class="wordmark"><em>Study</em> Bunny<span class="brand-heart">♥</span></span><span class="brand-caption">나의 작은 집중 공간</span></span></a><nav class="desktop-nav" aria-label="주 메뉴"></nav><button class="icon-button" data-action="settings" aria-label="타이머 설정"><svg class="icon"><use href="#i-settings"/></svg></button></header>
+<section class="welcome-banner"><div><span class="eyebrow">A LITTLE FOCUS, A LITTLE GROWTH</span><h1>작은 할 일이 모여,<br class="mobile-break"> 더 멋진 오늘이 돼요 <svg class="inline-heart"><use href="#i-heart"/></svg></h1><p>서두르지 않아도 괜찮아요. 토끼와 함께 한 걸음씩!</p></div><div class="paper-note">오늘도 조금 더<br>성장하는 나에게<br><span>♡</span></div></section>
+<main class="workspace" id="main-content">
+<section class="panel home-panel" aria-labelledby="home-heading"><div class="panel-label pink-label"><svg class="icon"><use href="#i-heart"/></svg><h2 id="home-heading">홈 대시보드</h2></div><div class="panel-body">
+<div class="greeting"><span class="small-sticker">🌼</span><div><h3 id="greeting">좋은 하루예요!</h3><p>오늘도 조금 더 성장하는 하루가 될 거예요!</p></div></div>
+<div class="home-scene scene"><img src="assets/study-room.webp" alt="분홍색 헤드폰을 쓴 토끼가 햇살 가득한 공부방에서 공부하는 모습" fetchpriority="high"><span class="scene-accessory" aria-hidden="true"></span><span class="scene-note">지금도<br>잘하고 있어!<br>♡</span></div>
+<div class="date-row"><span>▦ <strong id="today-date"></strong></span><button class="pill" data-action="goal">오늘의 목표 <span>›</span></button></div>
+<section class="task-summary"><div class="section-title"><h3>오늘의 할 일</h3><span id="home-progress-text"></span></div><div class="progress-track"><div id="task-progress"></div><span aria-hidden="true">♥</span></div></section>
+<ul id="home-tasks" class="task-list compact-list" aria-label="오늘의 할 일"></ul><button class="text-button home-more" data-view-link="tasks">할 일 모두 보기 <span>→</span></button><div class="little-message"><svg class="icon"><use href="#i-leaf"/></svg><span>아주 작은 시작도, 충분히 멋져요.</span></div></div></section>
+<section class="panel timer-panel" aria-labelledby="timer-heading"><div class="panel-label lavender-label"><svg class="icon"><use href="#i-bunny"/></svg><h2 id="timer-heading">집중 타이머</h2></div>
+<div class="timer-room scene"><img src="assets/study-room.webp" alt="토끼와 함께하는 포근한 공부방"><span class="scene-accessory" aria-hidden="true"></span><div class="timer-content"><p class="timer-intro" id="timer-status">지금,<br><strong>좋은 집중을 하고 있어요!</strong><br>토끼도 함께 집중할게요. ♡</p><div class="timer-ring" id="timer-ring"><div class="timer-face"><svg class="leaf-icon"><use href="#i-leaf"/></svg><span id="timer-display" role="timer" aria-label="남은 시간">25:00</span><span id="mode-label">집중 시간</span></div></div><div class="session-sticker"><strong id="session-label">포모도로 1/4</strong><div id="session-bunnies" aria-label="이번 사이클 완료 횟수"></div></div></div><div class="encourage-note">지금도<br>너무 잘하고<br>있어요! ♡</div><div class="timer-controls"><button id="btn-start" class="primary-button"><svg class="icon"><use href="#i-play"/></svg><span>시작하기</span></button><button id="btn-reset" class="reset-button" aria-label="타이머 초기화"><svg class="icon"><use href="#i-reset"/></svg></button></div></div>
+<div class="mode-tabs" role="group" aria-label="타이머 모드"><button data-mode="work" class="active" aria-pressed="true"><svg class="icon"><use href="#i-timer"/></svg><span>집중<small>(25분)</small></span></button><button data-mode="shortBreak" aria-pressed="false"><svg class="icon"><use href="#i-moon"/></svg><span>짧은 휴식<small>(5분)</small></span></button><button data-mode="longBreak" aria-pressed="false"><svg class="icon"><use href="#i-chart"/></svg><span>긴 휴식<small>(15분)</small></span></button><button data-mode="free" aria-pressed="false"><svg class="icon"><use href="#i-bunny"/></svg><span>자유 모드<small>(원하는 시간)</small></span></button></div>
+<div class="timer-totals"><span>오늘의 집중 <strong id="total-time">0분</strong></span><span>완료한 포모도로 <strong id="completed-count">0회</strong></span></div></section>
+<section class="panel organizer-panel" aria-labelledby="organizer-heading"><div class="panel-label green-label"><svg class="icon"><use href="#i-flower"/></svg><h2 id="organizer-heading">할 일 & 꾸미기</h2></div><div class="panel-body">
+<section class="tasks-section" aria-labelledby="tasks-heading"><div class="section-title"><h3 id="tasks-heading"><svg class="icon"><use href="#i-tasks"/></svg> 할 일 관리</h3><button class="add-button" data-action="add-task" aria-label="할 일 추가">+</button></div><div class="filter-tabs" role="group" aria-label="할 일 필터"><button class="active" data-filter="today" aria-pressed="true">오늘</button><button data-filter="week" aria-pressed="false">이번 주</button><button data-filter="all" aria-pressed="false">전체</button><button data-filter="done" aria-pressed="false">완료</button></div><ul id="all-tasks" class="task-list" aria-label="할 일 목록"></ul><button class="add-task-button" data-action="add-task">+ 할 일 추가하기</button></section>
+<section class="decorate-section" aria-labelledby="decorate-heading"><div class="section-title"><h3 id="decorate-heading"><svg class="icon"><use href="#i-palette"/></svg> 꾸미기 요소</h3><span class="muted">나만의 작은 공간</span></div><div class="decor-tabs" role="group" aria-label="꾸미기 종류"><button class="active" data-decor="background" aria-pressed="true">배경</button><button data-decor="accessory" aria-pressed="false">소품</button></div><div class="theme-grid" id="theme-grid" role="group" aria-label="공부방 배경 선택"></div><div class="accessory-grid" id="accessory-grid" role="group" aria-label="소품 선택" hidden></div><p class="decor-caption" id="decor-caption">햇살 가득한 오후의 공부방</p></section>
+</div></section>
+<section class="panel stats-panel" aria-labelledby="stats-heading" hidden><div class="panel-label lavender-label"><svg class="icon"><use href="#i-chart"/></svg><h2 id="stats-heading">나의 공부 기록</h2></div><div class="panel-body"><p class="stats-intro">차곡차곡 쌓이는 나의 성장 🌱</p><div class="stats-cards"><div><span>오늘 집중한 시간</span><strong id="stats-minutes">0<small>분</small></strong></div><div><span>오늘의 포모도로</span><strong id="stats-sessions">0<small>회</small></strong></div></div><div class="section-title"><h3>최근 7일의 집중</h3><span class="muted">단위: 분</span></div><div class="week-chart" id="week-chart" aria-label="최근 7일 집중 시간"></div><div class="goal-card"><svg class="icon"><use href="#i-heart"/></svg><p id="goal-message"></p><button class="pill" data-action="goal">목표 바꾸기</button></div><p class="stats-footnote">작은 노력 하나하나를 토끼가 기억할게요. ♡</p></div></section>
+</main><footer class="site-footer"><svg class="icon"><use href="#i-heart"/></svg><p>작은 할 일이 모여 오늘도 더 멋진 내가 돼요<br><strong>Study Bunny</strong> 와 함께해요!</p><span aria-hidden="true">✿</span></footer></div>
+<nav class="mobile-nav" aria-label="주 메뉴"></nav><div class="toast" id="toast" role="status" aria-live="polite"></div>
+<dialog id="task-dialog"><form id="task-form"><div class="dialog-heading"><h2>새로운 작은 할 일</h2><button type="button" class="close-button" data-close aria-label="닫기">×</button></div><p>하나씩, 천천히 해봐요. ♡</p><label>할 일<input name="title" maxlength="80" placeholder="예: 수학 문제 5개 풀기" required autocomplete="off"></label><label>날짜<input name="date" type="date" required></label><fieldset><legend>아이콘</legend><div class="emoji-options"><label><input type="radio" name="emoji" value="📒" checked><span>📒</span></label><label><input type="radio" name="emoji" value="📖"><span>📖</span></label><label><input type="radio" name="emoji" value="✏️"><span>✏️</span></label><label><input type="radio" name="emoji" value="🏋️"><span>🏋️</span></label><label><input type="radio" name="emoji" value="🌷"><span>🌷</span></label></div></fieldset><button class="primary-button" type="submit">+ 할 일 추가하기</button></form></dialog>
+<dialog id="settings-dialog"><form id="settings-form"><div class="dialog-heading"><h2>나의 집중 리듬</h2><button type="button" class="close-button" data-close aria-label="닫기">×</button></div><p>나에게 맞는 속도로 함께해요.</p><div class="settings-fields"><label>집중 (분)<input name="work" type="number" min="1" max="180" required></label><label>짧은 휴식 (분)<input name="shortBreak" type="number" min="1" max="60" required></label><label>긴 휴식 (분)<input name="longBreak" type="number" min="1" max="120" required></label><label>자유 모드 (분)<input name="free" type="number" min="1" max="180" required></label></div><label class="check-label"><input type="checkbox" name="sound"> 완료 알림음</label><p class="form-hint">시간을 변경하면 진행 중인 타이머가 초기화돼요.</p><button class="primary-button" type="submit">설정 저장하기</button></form></dialog>
+<dialog id="goal-dialog"><form id="goal-form"><div class="dialog-heading"><h2>오늘의 작은 목표</h2><button type="button" class="close-button" data-close aria-label="닫기">×</button></div><p>무리하지 않아도 괜찮아요. 꾸준함이 힘이에요!</p><label>하루 집중 목표 (분)<input name="goal" type="number" min="1" max="1440" required></label><button class="primary-button" type="submit">이만큼 해볼게요 ♡</button></form></dialog>
+</body></html>
