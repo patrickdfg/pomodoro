@@ -9,3 +9,4 @@ body[data-view=timer] .home-panel,body[data-view=timer] .organizer-panel,body[da
 /* Leave room for the bottom navigation on shorter phones. */
 @media(max-width:760px){body[data-view=timer] .timer-room{height:calc(100svh - 315px);min-height:480px}}
 .task-due{display:block;font-size:9px;color:#ac8d82;font-weight:400}
+@media(max-width:760px){.timer-content{padding-top:24px}.timer-intro{font-size:18px;margin-bottom:10px}.timer-intro strong{font-size:20px}.timer-ring{width:195px;height:195px}.session-sticker{margin-top:10px;padding:4px 8px;width:116px}.session-sticker strong{font-size:16px}.session-sticker svg{height:19px}}
